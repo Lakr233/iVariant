@@ -12,7 +12,7 @@ private func unknownKey() -> String {
     "unknown"
 }
 
-struct DeviceRecord {
+struct DeviceRecord: Codable {
     let Target: String
     let TargetType: String
     let TargetVariant: String
@@ -63,7 +63,7 @@ struct DeviceRecord {
 
 typealias HumanReadableName = String
 typealias DeviceVariant = String
-struct PlatformReport: Identifiable, Equatable {
+struct PlatformReport: Identifiable, Equatable, Codable {
     var id: UUID = UUID()
     let platform: String
     let variants: [HumanReadableName: DeviceRecord]

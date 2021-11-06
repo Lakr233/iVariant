@@ -13,13 +13,13 @@ struct ContentView: View {
     @State var highlight: Int?
     @State var reportOverlay: BundleReport?
     @State var dragOver = false
-
+    
     var body: some View {
         GeometryReader { reader in
             Group {
                 if loading {
                     ZStack { ProgressView() }
-                        .frame(width: reader.size.width, height: reader.size.height)
+                    .frame(width: reader.size.width, height: reader.size.height)
                 } else {
                     ScrollView {
                         VStack {
@@ -38,26 +38,30 @@ struct ContentView: View {
                                             .font(.system(size: 10, weight: .light, design: .monospaced))
                                     }
                                     Spacer()
-                                    Button(action: {
+                                    Button {
                                         let report = createReport(with: xcodes[idx])
                                         reportOverlay = report
-                                    }, label: {
+                                    } label: {
                                         Image(systemName: "arrow.right.circle.fill")
-                                    })
+                                    }
                                 }
                                 .padding(4)
-                                .onHover(perform: { hovering in
+                                .onHover { hovering in
                                     if hovering {
                                         highlight = idx
                                     } else {
                                         highlight = nil
                                     }
-                                })
+                                }
                                 .background(
                                     Color
                                         .yellow
                                         .opacity(highlight == idx ? 0.2 : 0)
                                         .cornerRadius(8)
+                                        .onTapGesture(count: 2) {
+                                            let report = createReport(with: xcodes[idx])
+                                            reportOverlay = report
+                                        }
                                 )
                                 .animation(.interactiveSpring(), value: highlight)
                             }
@@ -82,7 +86,7 @@ struct ContentView: View {
         .onAppear {
             searchXcodes()
         }
-        .onDrop(of: ["public.file-url"], isTargeted: $dragOver, perform: { providers in
+        .onDrop(of: ["public.file-url"], isTargeted: $dragOver) { providers in
             providers
                 .first?
                 .loadDataRepresentation(forTypeIdentifier: "public.file-url", completionHandler: { data, _ in
@@ -95,9 +99,9 @@ struct ContentView: View {
                     }
                 })
             return true
-        })
+        }
     }
-
+    
     func searchXcodes() {
         let applications = URL(fileURLWithPath: "/Applications")
         xcodes = (
@@ -117,10 +121,10 @@ struct ContentView: View {
                 return bundle
             }
             .compactMap { $0 }
-            ?? []
+        ?? []
         loading = false
     }
-
+    
     func obtainXcodeAvatar(for bundle: Bundle) -> Image {
         let icon = NSWorkspace
             .shared
@@ -134,7 +138,8 @@ struct ReportViewer: View {
     @State var filter: String = ""
     @State var displayingReport: BundleReport?
     @State var hightlightWhenCopy: Bool = false
-
+    @State var deviceCount = 0
+    
     func createFilletedReport() {
         debugPrint("creating display report with search input [\(filter)]")
         guard filter.count > 0 else {
@@ -153,7 +158,19 @@ struct ReportViewer: View {
             displayingReport = nil
         }
     }
-
+    
+    func copyReportToPasteboard(_ report: String) {
+        hightlightWhenCopy = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            withAnimation {
+                hightlightWhenCopy = false
+            }
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.declareTypes([.string], owner: nil)
+        pasteboard.setString(report, forType: .string)
+    }
+    
     var body: some View {
         GeometryReader { _ in
             if displayingReport == nil || displayingReport?.count == 0 {
@@ -169,47 +186,51 @@ struct ReportViewer: View {
                         ForEach(0 ..< displayingReport!.count, id: \.self) { platformIndex in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(displayingReport![platformIndex].platform)
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                    .textSelection(.enabled)
                                 Divider()
                                 ForEach([String](displayingReport![platformIndex].variants.keys.sorted()), id: \.self) { variantKey in
                                     Text(variantKey)
-                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    HStack {
-                                        Text(displayingReport![platformIndex].variants[variantKey]!.humanReadableReport)
-                                    }
-                                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                        .textSelection(.enabled)
+                                    
+                                    Text(displayingReport![platformIndex].variants[variantKey]!.humanReadableReport)
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .textSelection(.enabled)
                                 }
                             }
                             .padding(.bottom, 8)
                         }
                     }
+                    
                     .background(
                         Color.orange
                             .opacity(hightlightWhenCopy ? 0.2 : 0)
                     )
                     .padding(.bottom, 20)
                     .padding()
+                    .onAppear {
+                        for item in displayingReport ?? [] {
+                            for _ in item.variants.keys.sorted() {
+                                deviceCount += 1
+                            }
+                        }
+                    }
                 }
             }
         }
-        .onChange(of: bundleReport, perform: { _ in
+        .onChange(of: bundleReport) { _ in
             createFilletedReport()
-        })
-        .onChange(of: filter, perform: { _ in
+        }
+        .onChange(of: filter) { _ in
             createFilletedReport()
-        })
+        }
         .overlay(
-            VStack { Spacer()
+            VStack(alignment: .trailing, spacing: 0) { Spacer()
                 HStack { Spacer()
                     TextField("Search Devices", text: $filter)
                         .frame(width: 200)
-                    Button(action: {
-                        hightlightWhenCopy = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation {
-                                hightlightWhenCopy = false
-                            }
-                        }
+                    Button {
                         var text = ""
                         for item in displayingReport ?? [] {
                             for key in item.variants.keys.sorted() {
@@ -223,21 +244,36 @@ struct ReportViewer: View {
                         }
                         text = text.trimmingCharacters(in: .whitespacesAndNewlines)
                         if text.count > 0 {
-                            let pasteboard = NSPasteboard.general
-                            pasteboard.declareTypes([.string], owner: nil)
-                            pasteboard.setString(text, forType: .string)
+                            copyReportToPasteboard(text)
                         }
-                    }, label: {
+                    } label: {
                         Image(systemName: "doc.on.doc.fill")
-                    })
-                    Button(action: {
+                    }
+                    Button {
+                        do {
+                            let jsonEncoder = JSONEncoder()
+                            jsonEncoder.outputFormatting = .prettyPrinted
+                            let jsonData = try jsonEncoder.encode(displayingReport)
+                            if let jsonSting = String(data: jsonData, encoding: .utf8) {
+                                copyReportToPasteboard(jsonSting)
+                            }
+                        } catch {
+                            debugPrint(error.localizedDescription)
+                        }
+                    } label: {
+                        Image(systemName: "curlybraces")
+                    }
+                    Button {
                         bundleReport = nil
-                    }, label: {
+                    } label: {
                         Image(systemName: "xmark.circle.fill")
-                    })
+                    }
                 }
+                Text("\(deviceCount) Devices")
+                    .foregroundColor(.secondary).opacity(0.5)
             }
-            .padding()
+                .padding(.trailing, 20)
+                .padding(.bottom, 2)
         )
         .background(Color(NSColor.textBackgroundColor))
         .animation(.interactiveSpring(), value: displayingReport)

@@ -15,11 +15,11 @@ struct iVariantApp: App {
                 .frame(minWidth: 800, maxWidth: 5000, minHeight: 400, maxHeight: 5000)
                 .toolbar {
                     ToolbarItem {
-                        Button(action: {
+                        Button {
                             NSWorkspace.shared.open(URL(string: "https://github.com/Co2333/iVariant")!)
-                        }, label: {
+                        } label: {
                             Image(systemName: "questionmark.circle.fill")
-                        })
+                        }
                     }
                 }
         }
